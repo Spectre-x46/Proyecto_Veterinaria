@@ -2,10 +2,11 @@ from django.db import models
 
 class Propietario(models.Model):
     nombre = models.CharField(max_length=50)
+    apellido = models.CharField(max_length=50, null=True, blank=True)
     telefono_contacto = models.CharField(max_length=20)
-
+    email = models.EmailField(blank=True, null=True)
     def __str__(self):
-        return f"{self.nombre} - {self.telefono_contacto}"
+        return f"{self.nombre} {self.apellido}"
 
 # Paciente representa a una mascota que es atendida en la clínica veterinaria. Cada paciente tiene un nombre, especie, raza (opcional), fecha de nacimiento, fecha de registro automática y está asociado a un propietario.
 class Paciente(models.Model):

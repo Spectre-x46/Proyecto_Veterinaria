@@ -16,6 +16,9 @@ python -m venv venv
 
 # Instalar dependencias
 pip install django psycopg2-binary
+
+# Generar requirements.txt
+pip freeze > requirements.txt
 ```
 
 ## 2. Inicialización del Proyecto
@@ -63,10 +66,12 @@ from django.db import models
 
 class Propietario(models.Model):
     nombre = models.CharField(max_length=50)
+    apellido = models.CharField(max_length=50, null=True, blank=True)
     telefono_contacto = models.CharField(max_length=20)
+    email = models.EmailField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.nombre} - {self.telefono_contacto}"
+        return f"{self.nombre} {self.apellido}"
 
 class Paciente(models.Model):
     ESPECIES = [
@@ -79,20 +84,26 @@ class Paciente(models.Model):
     nombre = models.CharField(max_length=100)
     especie = models.CharField(max_length=20, choices=ESPECIES)
     raza = models.CharField(max_length=100, blank=True, null=True)
-    fecha_nacimiento = models.DateField(help_text="Fecha de nacimiento de la mascota")
+    fecha_nacimiento = models.DateField()
     fecha_registro = models.DateField(auto_now_add=True)
     propietario = models.ForeignKey(Propietario, on_delete=models.CASCADE, related_name='pacientes')
 ```
 
 ## 5. Gestión de Migraciones
 
-Al ejecutar el comando de generación, Django crea el archivo `pacientes/migrations/0001_initial.py`, el cual contiene las instrucciones técnicas para crear las tablas en PostgreSQL.
+Al ejecutar el comando de generación, Django crea archivos de migración en `pacientes/migrations/`.
 
 ### Archivo de Migración Inicial (`0001_initial.py`)
 Este archivo traduce las clases de Python a operaciones de base de datos:
 
 - **CreateModel**: Crea la tabla `pacientes_propietario`.
 - **CreateModel**: Crea la tabla `pacientes_paciente` incluyendo la llave foránea (ForeignKey) hacia el propietario.
+
+### Archivo de Migración Secundaria (`0002_propietario_apellido_propietario_email_and_more.py`)
+Esta migración agrega campos adicionales al modelo Propietario y modifica el modelo Paciente:
+
+- **AddField**: Agrega `apellido` y `email` a `pacientes_propietario`.
+- **AlterField**: Modifica `fecha_nacimiento` en `pacientes_paciente` removiendo `help_text`.
 
 ### Comandos de Ejecución:
 ```powershell
@@ -113,31 +124,22 @@ python manage.py runserver
 
 ## 7. Formularios (`pacientes/forms.py`)
 
-Los formularios facilitan la validación y renderización de datos en los templates. Creamos formularios basados en modelos para `Propietario` y `Paciente`:
+Los formularios facilitan la validación y renderización de datos en los templates. Creamos un formulario basado en modelo para `Paciente`:
 
 ```python
 from django import forms
-from .models import Propietario, Paciente
-
-class PropietarioForm(forms.ModelForm):
-    class Meta:
-        model = Propietario
-        fields = ['nombre', 'telefono_contacto']
-        widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre del propietario'}),
-            'telefono_contacto': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Teléfono de contacto'}),
-        }
+from .models import Paciente
 
 class PacienteForm(forms.ModelForm):
     class Meta:
         model = Paciente
         fields = ['nombre', 'especie', 'raza', 'fecha_nacimiento', 'propietario']
         widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre de la mascota'}),
-            'especie': forms.Select(attrs={'class': 'form-select'}),
-            'raza': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Raza (opcional)'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'especie': forms.Select(attrs={'class': 'form-control'}),
+            'raza': forms.TextInput(attrs={'class': 'form-control'}),
             'fecha_nacimiento': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'propietario': forms.Select(attrs={'class': 'form-select'}),
+            'propietario': forms.Select(attrs={'class': 'form-control'}),
         }
 ```
 
@@ -174,9 +176,9 @@ from . import views
 
 urlpatterns = [
     path('', views.PacienteListView.as_view(), name='paciente_list'),           # Lista de pacientes
-    path('paciente/nuevo/', views.PacienteCreateView.as_view(), name='paciente_create'),  # Crear paciente
-    path('paciente/<int:pk>/editar/', views.PacienteUpdateView.as_view(), name='paciente_update'),  # Editar paciente
-    path('paciente/<int:pk>/eliminar/', views.PacienteDeleteView.as_view(), name='paciente_delete'),  # Eliminar paciente
+    path('nuevo/', views.PacienteCreateView.as_view(), name='paciente_create'),  # Crear paciente
+    path('editar/<int:pk>/', views.PacienteUpdateView.as_view(), name='paciente_update'),  # Editar paciente
+    path('eliminar/<int:pk>/', views.PacienteDeleteView.as_view(), name='paciente_delete'),  # Eliminar paciente
 ]
 ```
 
@@ -307,46 +309,51 @@ Django utiliza templates para separar la lógica de presentación. Creamos un di
 </html>
 ```
 
-### Lista de pacientes (`templates/paciente_list.html`):
+### Lista de pacientes (`templates/pacientes/paciente_list.html`):
 ```html
 {% extends 'base.html' %}
 
-{% block title %}Lista de Pacientes{% endblock %}
-
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>🐾 Lista de Pacientes</h1>
-    <a href="{% url 'paciente_create' %}" class="btn btn-primary">➕ Nuevo Paciente</a>
-</div>
+<h2>Lista de Pacientes (mascotas)</h2>
 
-<div class="row">
-    {% for paciente in pacientes %}
-    <div class="col-md-6 col-lg-4 mb-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">{{ paciente.nombre }}</h5>
-                <p class="card-text">
-                    <strong>Especie:</strong> {{ paciente.get_especie_display }}<br>
-                    {% if paciente.raza %}<strong>Raza:</strong> {{ paciente.raza }}<br>{% endif %}
-                    <strong>Propietario:</strong> {{ paciente.propietario.nombre }}<br>
-                    <strong>Nacimiento:</strong> {{ paciente.fecha_nacimiento|date:"d/m/Y" }}<br>
-                    <strong>Registro:</strong> {{ paciente.fecha_registro|date:"d/m/Y" }}
-                </p>
-            </div>
-            <div class="card-footer">
-                <a href="{% url 'paciente_update' paciente.pk %}" class="btn btn-warning btn-sm">✏️ Editar</a>
-                <a href="{% url 'paciente_delete' paciente.pk %}" class="btn btn-danger btn-sm">🗑️ Eliminar</a>
-            </div>
-        </div>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Especie</th>
+                    <th>Raza</th>
+                    <th>Fecha de Nacimiento</th>
+                    <th>Propietario</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for paciente in pacientes %}
+                <tr>
+                    <td>{{ paciente.nombre }}</td>
+                    <td>{{ paciente.especie }}</td>
+                    <td>{{ paciente.raza }}</td>
+                    <td>{{ paciente.fecha_nacimiento }}</td>
+                    <td>{{ paciente.propietario }}</td>
+                    <td>
+                        <a href="{% url 'paciente_update' paciente.pk %}" class="btn btn-sm btn-primary">Editar</a>
+                        <form action="{% url 'paciente_delete' paciente.pk %}" method="post" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center">No hay pacientes registrados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{% url 'paciente_create' %}" class="btn btn-primary">Nuevo Paciente</a>
     </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="alert alert-info text-center">
-            <h4>No hay pacientes registrados</h4>
-            <p>¡Agrega el primer paciente haciendo clic en "Nuevo Paciente"!</p>
-        </div>
-    </div>
-    {% endfor %}
 </div>
 {% endblock %}
 ```
@@ -378,99 +385,13 @@ Django utiliza templates para separar la lógica de presentación. Creamos un di
 {% endblock %}
 ```
 
-### 📚 **Explicación de los cambios realizados en los templates:**
+### 📚 **Explicación de los templates:**
 
-#### **1. ¿Por qué actualizar el `base.html`?**
-**Antes:**
-```html
-<a class="nav-link text-white" href="#">Registrar Mascota</a>
-```
+Los templates utilizan una estructura de tabla para la lista de pacientes, lo que facilita la comparación de datos. La eliminación se realiza directamente desde la tabla mediante formularios inline para una experiencia más fluida.
 
-**Ahora:**
-```html
-<a class="nav-link text-white" href="{% url 'paciente_create' %}">Registrar Mascota</a>
-```
+### Confirmación de eliminación (`templates/pacientes/paciente_confirm_delte.html`):
 
-**¿Por qué el cambio?**
-- **Enlaces dinámicos**: `{% url %}` genera URLs automáticamente según las rutas definidas
-- **Mantenibilidad**: Si cambias las URLs en `urls.py`, los enlaces se actualizan solos
-- **Legibilidad**: Claramente indica qué vista se está llamando
-- **Django best practice**: Los enlaces hardcodeados son anti-patrón
-
-#### **2. ¿Por qué simplificar el `paciente_form.html`?**
-**Antes:** Campos renderizados individualmente con labels y manejo de errores manual
-**Ahora:** `{{ form.as_p }}` renderiza todo automáticamente
-
-**¿Por qué el cambio?**
-- **Eficiencia**: Una línea en lugar de 10-15 líneas de código
-- **Consistencia**: Los estilos vienen de `forms.py` (widgets)
-- **Mantenibilidad**: Cambios en el formulario se reflejan automáticamente
-- **Principio DRY**: No repetir código de renderización
-
-#### **3. ¿Por qué cambiar a tabla en `paciente_list.html`?**
-**Antes:** Cards responsivas con diseño moderno
-**Ahora:** Tabla clásica con filas y columnas
-
-**¿Por qué el cambio?**
-- **Funcionalidad sobre estética**: Las tablas son mejores para datos tabulares
-- **Mejor UX para datos**: Fácil comparar información entre filas
-- **Más información visible**: Sin scroll excesivo
-- **Profesional**: Las aplicaciones de gestión usan tablas para listados
-
-### 🔧 **Beneficios de estos cambios:**
-
-#### **Para principiantes:**
-- ✅ **Código más simple**: Menos HTML manual, más Django
-- ✅ **Mejor organización**: Templates más limpios y legibles
-- ✅ **Aprendizaje progresivo**: De manual a automático
-
-#### **Para el proyecto:**
-- ✅ **Mantenibilidad**: Cambios en URLs/forms se propagan automáticamente
-- ✅ **Consistencia**: Todos los templates siguen el mismo patrón
-- ✅ **Escalabilidad**: Fácil agregar nuevos campos/formularios
-- ✅ **Profesional**: Código que sigue las mejores prácticas de Django
-
-### 💡 **Lección importante para principiantes:**
-
-**Django te da herramientas poderosas para evitar código repetitivo:**
-- **`{% url %}`**: Genera URLs dinámicas
-- **`{{ form.as_p }}`**: Renderiza formularios completos
-- **`{% for %}`**: Itera sobre datos automáticamente
-- **`{% if %}`**: Lógica condicional en templates
-
-**El objetivo no es escribir menos código, sino escribir código más inteligente y mantenible.**
-
-### Confirmación de eliminación (`templates/paciente_confirm_delte.html`):
-```html
-{% extends 'base.html' %}
-
-{% block title %}Confirmar Eliminación{% endblock %}
-
-{% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card border-danger shadow">
-            <div class="card-header bg-danger text-white">
-                <h3 class="card-title mb-0">⚠️ Confirmar Eliminación</h3>
-            </div>
-            <div class="card-body">
-                <p class="lead">¿Estás seguro de que deseas eliminar al paciente <strong>{{ paciente.nombre }}</strong>?</p>
-                <div class="alert alert-warning">
-                    <strong>Advertencia:</strong> Esta acción no se puede deshacer.
-                </div>
-                <div class="d-flex gap-2">
-                    <form method="post" class="d-inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-danger">🗑️ Sí, eliminar</button>
-                    </form>
-                    <a href="{% url 'paciente_list' %}" class="btn btn-secondary">❌ Cancelar</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-```
+**Nota**: Este archivo está vacío en la implementación actual. La eliminación de pacientes se realiza directamente desde la tabla en `paciente_list.html` mediante un formulario inline, sin necesidad de una página de confirmación separada.
 
 ## 10. Panel de Administración
 
@@ -481,15 +402,14 @@ from .models import Propietario, Paciente
 
 @admin.register(Propietario)
 class PropietarioAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'telefono_contacto']
-    search_fields = ['nombre', 'telefono_contacto']
+    list_display = ('nombre', 'telefono_contacto')
+    search_fields = ('nombre', 'telefono_contacto')
 
 @admin.register(Paciente)
 class PacienteAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'especie', 'raza', 'propietario', 'fecha_registro']
-    list_filter = ['especie', 'fecha_registro']
-    search_fields = ['nombre', 'propietario__nombre']
-    date_hierarchy = 'fecha_registro'
+    list_display = ('nombre', 'especie', 'raza', 'fecha_nacimiento', 'fecha_registro', 'propietario')
+    list_filter = ('especie', 'fecha_registro')
+    search_fields = ('nombre', 'raza', 'propietario__nombre')
 ```
 
 ### Creación del superusuario:
@@ -529,11 +449,13 @@ Veterinaria/
 │   └── ...
 ├── templates/                   # Templates HTML
 │   ├── base.html
-│   ├── paciente_list.html
-│   ├── paciente_form.html
-│   └── paciente_confirm_delte.html
+│   ├── pacientes/
+│   │   ├── paciente_list.html
+│   │   ├── paciente_form.html
+│   │   └── paciente_confirm_delte.html
 ├── manage.py                    # Script de gestión
-└── requirements.txt             # Dependencias
+├── requirements.txt             # Dependencias: asgiref, Django, psycopg2-binary, sqlparse, tzdata
+└── README.md                    # Este archivo
 ```
 
 ### Próximos Pasos:
@@ -546,5 +468,5 @@ Veterinaria/
 ---
 
 **Desarrollado por**: Neo
-**Fecha**: {{ fecha_actual }}
+**Fecha**: 20 de marzo de 2026
 **Versión**: 1.0.0
