@@ -19,6 +19,6 @@ class Paciente(models.Model):
     nombre = models.CharField(max_length=100)
     especie = models.CharField(max_length=20, choices=ESPECIES)
     raza = models.CharField(max_length=100, blank=True, null=True)
-    fecha_nacimiento = models.DateField(help_text="Fecha de nacimiento de la mascota")
+    fecha_nacimiento = models.DateField()
     fecha_registro = models.DateField(auto_now_add=True)
     propietario = models.ForeignKey(Propietario, on_delete=models.CASCADE, related_name='pacientes')

@@ -270,30 +270,39 @@ Django utiliza templates para separar la lógica de presentación. Creamos un di
 
 ### Template base (`templates/base.html`):
 ```html
-<!DOCTYPE html>
-<html lang="es">
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Clínica Veterinaria{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clínica Veterinaria</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'paciente_list' %}">🐾 Clínica Veterinaria</a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{% url 'paciente_list' %}">Pacientes</a>
-                <a class="nav-link" href="{% url 'paciente_create' %}">Nuevo Paciente</a>
+            <a class="navbar-brand" href="#">🐾 Clínica Veterinaria</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="#">Registrar Mascota</a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
-
-    <div class="container mt-4">
-        {% block content %}{% endblock %}
+    <div class="container">
+        {% block content %}
+        <!-- Aqui se inyectara el contenido de las plantillas hijas -->
+        {% endblock %}
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
 </body>
 </html>
 ```
@@ -342,44 +351,94 @@ Django utiliza templates para separar la lógica de presentación. Creamos un di
 {% endblock %}
 ```
 
-### Formulario de paciente (`templates/paciente_form.html`):
+### Formulario de paciente (`templates/pacientes/paciente_form.html`):
 ```html
-{% extends 'base.html' %}
-
-{% block title %}{{ title }}{% endblock %}
+{% extends 'base.html' %}  <!-- Hereda del template base -->
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h3 class="card-title mb-0">{{ title }}</h3>
+<div class="row justify-content-center">  <!-- Centra el formulario horizontalmente -->
+    <div class="col-md-8">  <!-- Ancho responsivo: 8 columnas en medium+ -->
+        <div class="card shadow-sm">  <!-- Tarjeta con sombra sutil -->
+            <div class="card-header bg-primary text-white">  <!-- Cabecera azul con texto blanco -->
+                <h5 class="mb-0">Registrar Nueva Mascota</h5>  <!-- Título del formulario -->
             </div>
             <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {% for field in form %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        {{ field }}
-                        {% if field.errors %}
-                        <div class="text-danger small">
-                            {% for error in field.errors %}{{ error }}{% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    {% endfor %}
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-success">💾 Guardar</button>
-                        <a href="{% url 'paciente_list' %}" class="btn btn-secondary">❌ Cancelar</a>
-                    </div>
+                <form method="POST">  <!-- Formulario POST para enviar datos -->
+                    {% csrf_token %}  <!-- Protección CSRF obligatoria -->
+
+                    <!-- Renderiza todos los campos del formulario automáticamente -->
+                    {{ form.as_p }}  <!-- 'as_p' = cada campo en un párrafo separado -->
+
+                    <button type="submit" class="btn btn-success">Guardar</button>  <!-- Botón submit -->
+                    <a href="{% url 'paciente_list' %}" class="btn btn-secondary">Cancelar</a>  <!-- Enlace cancelar -->
                 </form>
             </div>
         </div>
     </div>
-</div>
 {% endblock %}
 ```
+
+### 📚 **Explicación de los cambios realizados en los templates:**
+
+#### **1. ¿Por qué actualizar el `base.html`?**
+**Antes:**
+```html
+<a class="nav-link text-white" href="#">Registrar Mascota</a>
+```
+
+**Ahora:**
+```html
+<a class="nav-link text-white" href="{% url 'paciente_create' %}">Registrar Mascota</a>
+```
+
+**¿Por qué el cambio?**
+- **Enlaces dinámicos**: `{% url %}` genera URLs automáticamente según las rutas definidas
+- **Mantenibilidad**: Si cambias las URLs en `urls.py`, los enlaces se actualizan solos
+- **Legibilidad**: Claramente indica qué vista se está llamando
+- **Django best practice**: Los enlaces hardcodeados son anti-patrón
+
+#### **2. ¿Por qué simplificar el `paciente_form.html`?**
+**Antes:** Campos renderizados individualmente con labels y manejo de errores manual
+**Ahora:** `{{ form.as_p }}` renderiza todo automáticamente
+
+**¿Por qué el cambio?**
+- **Eficiencia**: Una línea en lugar de 10-15 líneas de código
+- **Consistencia**: Los estilos vienen de `forms.py` (widgets)
+- **Mantenibilidad**: Cambios en el formulario se reflejan automáticamente
+- **Principio DRY**: No repetir código de renderización
+
+#### **3. ¿Por qué cambiar a tabla en `paciente_list.html`?**
+**Antes:** Cards responsivas con diseño moderno
+**Ahora:** Tabla clásica con filas y columnas
+
+**¿Por qué el cambio?**
+- **Funcionalidad sobre estética**: Las tablas son mejores para datos tabulares
+- **Mejor UX para datos**: Fácil comparar información entre filas
+- **Más información visible**: Sin scroll excesivo
+- **Profesional**: Las aplicaciones de gestión usan tablas para listados
+
+### 🔧 **Beneficios de estos cambios:**
+
+#### **Para principiantes:**
+- ✅ **Código más simple**: Menos HTML manual, más Django
+- ✅ **Mejor organización**: Templates más limpios y legibles
+- ✅ **Aprendizaje progresivo**: De manual a automático
+
+#### **Para el proyecto:**
+- ✅ **Mantenibilidad**: Cambios en URLs/forms se propagan automáticamente
+- ✅ **Consistencia**: Todos los templates siguen el mismo patrón
+- ✅ **Escalabilidad**: Fácil agregar nuevos campos/formularios
+- ✅ **Profesional**: Código que sigue las mejores prácticas de Django
+
+### 💡 **Lección importante para principiantes:**
+
+**Django te da herramientas poderosas para evitar código repetitivo:**
+- **`{% url %}`**: Genera URLs dinámicas
+- **`{{ form.as_p }}`**: Renderiza formularios completos
+- **`{% for %}`**: Itera sobre datos automáticamente
+- **`{% if %}`**: Lógica condicional en templates
+
+**El objetivo no es escribir menos código, sino escribir código más inteligente y mantenible.**
 
 ### Confirmación de eliminación (`templates/paciente_confirm_delte.html`):
 ```html
